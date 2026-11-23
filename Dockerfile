@@ -1,35 +1,6 @@
-FROM maven:3.9.9-eclipse-temurin-21 AS build
-
-WORKDIR /app
-
-COPY pom.xml .
-COPY src ./src
-
-RUN mvn -B clean package -DskipTests
-
-FROM eclipse-temurin:21-jre
-
-WORKDIR /app
-
-COPY --from=build /app/target/*.jar app.jar
-
-EXPOSE 10000
-
-ENTRYPOINT ["sh", "-c", "java -Dserver.port=${PORT:-10000} -jar app.jar"]FROM maven:3.9.9-eclipse-temurin-21 AS build
-
-WORKDIR /app
-
-COPY pom.xml .
-COPY src ./src
-
-RUN mvn -B clean package -DskipTests
-
-FROM eclipse-temurin:21-jre
-
-WORKDIR /app
-
-COPY --from=build /app/target/*.jar app.jar
-
-EXPOSE 10000
-
-ENTRYPOINT ["sh", "-c", "java -Dserver.port=${PORT:-10000} -jar app.jar"]
+RUN for i in 1 2 3 4 5; do \
+    mvn -B -ntp clean package -DskipTests && exit 0; \
+    echo "Maven download failed. Retrying in 30 seconds..."; \
+    sleep 30; \
+done; \
+exit 1
