@@ -4,25 +4,48 @@ import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
 import io.jsonwebtoken.security.Keys;
+
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
+import java.nio.charset.StandardCharsets;
 import java.security.Key;
 import java.util.Date;
 
 @Service
 public class JwtService {
 
-    private static final String SECRET =
-            "resumebuilderprojectjwtsecretkeyresumebuilder2026resumebuilder";
+    private final Key key;
 
-    private final Key key = Keys.hmacShaKeyFor(SECRET.getBytes());
+    private static final long JWT_EXPIRATION =
+            1000L * 60 * 60 * 24;
+
+    public JwtService(
+            @Value("${jwt.secret}") String secret) {
+
+        if (secret == null || secret.getBytes(StandardCharsets.UTF_8).length < 32) {
+            throw new IllegalArgumentException(
+                    "JWT secret must contain at least 32 bytes"
+            );
+        }
+
+        this.key = Keys.hmacShaKeyFor(
+                secret.getBytes(StandardCharsets.UTF_8)
+        );
+    }
 
     public String generateToken(String email) {
 
+        Date now = new Date();
+
+        Date expiration = new Date(
+                now.getTime() + JWT_EXPIRATION
+        );
+
         return Jwts.builder()
                 .setSubject(email)
-                .setIssuedAt(new Date())
-                .setExpiration(new Date(System.currentTimeMillis() + 1000 * 60 * 60 * 24))
+                .setIssuedAt(now)
+                .setExpiration(expiration)
                 .signWith(key, SignatureAlgorithm.HS256)
                 .compact();
     }
@@ -34,8 +57,10 @@ public class JwtService {
 
     public boolean isTokenValid(String token, String email) {
 
-        return extractEmail(token).equals(email)
-                && !extractClaims(token).getExpiration().before(new Date());
+        Claims claims = extractClaims(token);
+
+        return claims.getSubject().equals(email)
+                && claims.getExpiration().after(new Date());
     }
 
     private Claims extractClaims(String token) {

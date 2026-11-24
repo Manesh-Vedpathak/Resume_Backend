@@ -31,6 +31,14 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         this.userRepository = userRepository;
     }
 
+    // Allow browser CORS preflight requests without JWT authentication
+    @Override
+    protected boolean shouldNotFilter(HttpServletRequest request)
+            throws ServletException {
+
+        return "OPTIONS".equalsIgnoreCase(request.getMethod());
+    }
+
     @Override
     protected void doFilterInternal(
             HttpServletRequest request,
@@ -38,41 +46,29 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             FilterChain filterChain)
             throws ServletException, IOException {
 
-        String authHeader =
-                request.getHeader("Authorization");
+        String authHeader = request.getHeader("Authorization");
 
-        /*
-         * No JWT token
-         */
-        if (authHeader == null
-                || !authHeader.startsWith("Bearer ")) {
-
+        // Continue if no JWT token is provided
+        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
             filterChain.doFilter(request, response);
             return;
         }
 
-        String token =
-                authHeader.substring(7);
+        String token = authHeader.substring(7);
 
         try {
 
-            String email =
-                    jwtService.extractEmail(token);
+            String email = jwtService.extractEmail(token);
 
-            if (email != null
-                    && SecurityContextHolder
-                    .getContext()
-                    .getAuthentication() == null) {
+            if (email != null &&
+                    SecurityContextHolder.getContext().getAuthentication() == null) {
 
-                User user =
-                        userRepository
-                                .findByEmail(email)
-                                .orElse(null);
+                User user = userRepository
+                        .findByEmail(email)
+                        .orElse(null);
 
-                if (user != null
-                        && jwtService.isTokenValid(
-                                token,
-                                user.getEmail())) {
+                if (user != null &&
+                        jwtService.isTokenValid(token, user.getEmail())) {
 
                     SimpleGrantedAuthority authority =
                             new SimpleGrantedAuthority(
@@ -83,26 +79,18 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                             new UsernamePasswordAuthenticationToken(
                                     user.getEmail(),
                                     null,
-                                    Collections.singletonList(
-                                            authority
-                                    )
+                                    Collections.singletonList(authority)
                             );
 
-                    SecurityContextHolder
-                            .getContext()
+                    SecurityContextHolder.getContext()
                             .setAuthentication(authentication);
                 }
             }
 
         } catch (Exception e) {
 
-            /*
-             * Invalid/expired JWT.
-             * Continue without authentication.
-             */
-
-            SecurityContextHolder
-                    .clearContext();
+            // Invalid or expired JWT: clear authentication
+            SecurityContextHolder.clearContext();
         }
 
         filterChain.doFilter(request, response);
